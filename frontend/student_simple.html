@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEEDS - Student (Simple Test)</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { color: #333; text-align: center; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { background-color: #4285f4; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background-color: #3367d6; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; }
+        #connectionStatus { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        #messages { height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9; }
+        #audio-indicator { display: none; padding: 10px; margin: 10px 0; border-radius: 4px; background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SEEDS Student Portal (Test Mode)</h1>
+
+        <div>
+            <h3> Connection Setup</h3>
+            <div>
+                <label for="serverAddress">Server Address:</label>
+                <input type="text" id="serverAddress" placeholder="e.g., 192.168.152.211:8001" value="192.168.152.211:8001">
+            </div>
+            <div>
+                <label for="studentName">Your Name:</label>
+                <input type="text" id="studentName" placeholder="Enter your name" value="Student">
+            </div>
+            <div>
+                <label for="sessionId">Session ID:</label>
+                <input type="number" id="sessionId" placeholder="Enter session ID (e.g., 1)" value="1">
+            </div>
+            <button onclick="connectToSession()" id="connectBtn">Join Session</button>
+            <button onclick="disconnectFromSession()" id="disconnectBtn" disabled>Leave Session</button>
+            <div id="connectionStatus">Not connected</div>
+        </div>
+
+        <div class="section">
+            <!-- Audio Reception -->
+            <div>
+                <h3>Audio</h3>
+                <div>
+                    <label>Teacher Audio Status:</label>
+                    <div id="audioVisualization" style="height: 60px; background: #f0f0f0; border: 1px solid #ccc; padding: 10px; text-align: center; line-height: 40px;">
+                        Waiting for teacher audio...
+                    </div>
+                    <div id="audioDebug" style="margin-top:6px;font-size:12px;color:#666;">Last chunk: n/a</div>
+                    <div style="margin-top:8px;"><button id="enableAudioBtn" type="button">Enable Audio</button></div>
+                    <audio id="liveAudio" autoplay style="display:none"></audio>
+                    <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                        Audio streaming active - you should hear teacher's voice through your speakers
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interaction Controls -->
+            <div>
+                <h3>Interaction</h3>
+                
+                <div>
+                    <button onclick="toggleRaiseHand()" id="raiseHandBtn">
+                        Raise Hand
+                    </button>
+                    <button onclick="toggleQuestionForm()" id="questionBtn">
+                         Ask Question
+                    </button>
+                </div>
+
+                <div id="questionForm" style="display: none; margin-top: 10px;">
+                    <div>
+                        <label for="questionText">Your Question:</label>
+                        <textarea id="questionText" placeholder="Type your question here..." rows="3"></textarea>
+                        <button onclick="sendQuestion()">Send Question</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div>
+            <h3>Class Communication</h3>
+            <div id="messages" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;"></div>
+            <div>
+                <input type="text" id="messageInput" placeholder="Send message to class..." onkeypress="handleMessageKeyPress(event)">
+                <button onclick="sendMessage()">Send Message</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let studentName = 'Student';
+        let currentSessionId = null;
+        let handRaised = false;
+        let audioContext = null;
+    let audioQueue = [];
+    let isPlayingAudio = false;
+    // MSE playback state
+    let mediaSource = null;
+    let sourceBuffer = null;
+    let mseQueue = [];
+    let mseMime = null;
+    let mseOpen = false;
+
+        function enqueueAndPlay(url) {
+            audioQueue.push(url);
+            playNextFromQueue();
+        }
+
+        function playNextFromQueue() {
+            if (isPlayingAudio || audioQueue.length === 0) return;
+            const nextUrl = audioQueue.shift();
+            const audio = new Audio();
+            audio.src = nextUrl;
+            audio.volume = 1.0;
+            isPlayingAudio = true;
+            audio.play().catch(err => {
+                console.log('Queued audio play failed:', err?.message || err);
+            });
+            audio.onended = () => {
+                URL.revokeObjectURL(nextUrl);
+                isPlayingAudio = false;
+                playNextFromQueue();
+            };
+            audio.onerror = () => {
+                URL.revokeObjectURL(nextUrl);
+                isPlayingAudio = false;
+                playNextFromQueue();
+            };
+        }
+
+    const WS_BASE = 'ws://192.168.152.211:8001';
+
+        function connectToSession() {
+            const sessionId = document.getElementById('sessionId').value;
+            const name = document.getElementById('studentName').value;
+            const serverAddress = document.getElementById('serverAddress').value;
+            
+            if (!sessionId) {
+                alert('Please enter a session ID');
+                return;
+            }
+            
+            if (!name) {
+                alert('Please enter your name');
+                return;
+            }
+            
+            if (!serverAddress) {
+                alert('Please enter server address');
+                return;
+            }
+
+            studentName = name;
+            currentSessionId = sessionId;
+            
+            if (ws) {
+                ws.close();
+            }
+
+            // Build WebSocket URL from user input
+            const wsUrl = `ws://${serverAddress}/ws/${sessionId}`;
+            
+            // Show connecting status
+            addMessage('system', `Connecting to session ${sessionId}...`);
+            console.log('Attempting WebSocket connection to:', wsUrl);
+            
+            try {
+                // Connect without token for testing
+                ws = new WebSocket(wsUrl);
+            } catch (error) {
+                console.error('WebSocket creation error:', error);
+                addMessage('system', `Failed to create connection: ${error.message}`);
+                alert('Connection failed: ' + error.message);
+                return;
+            }
+
+            ws.onopen = function() {
+                console.log('WebSocket connected');
+                updateConnectionStatus(true);
+                addMessage('system', `Connected to session ${sessionId} as ${studentName}`);
+                
+                // Initialize audio context with user interaction
+                initializeAudioContext();
+                // Try to kick off live audio element playback (post-gesture)
+                const live = document.getElementById('liveAudio');
+                if (live) {
+                    live.play().catch(()=>{});
+                }
+                
+                // Send initial message to identify as student
+                ws.send(JSON.stringify({
+                    type: 'user_info',
+                    name: studentName,
+                    role: 'student'
+                }));
+
+                // Show audio visualization
+                showAudioVisualization();
+            };
+
+            ws.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    console.log('Received message:', message);
+
+                    switch(message.type) {
+                        case 'audio_chunk':
+                            // Handle real-time audio from teacher
+                            handleAudioChunk(message.data, message.mimeType);
+                            break;
+                            
+                        case 'audio_file':
+                            // Handle complete audio file from teacher
+                            handleAudioFile(message.data, message.filename, message.mimeType);
+                            break;
+                            
+                        case 'audio_control':
+                            if (message.action === 'play_test') {
+                                showAudioActivity('🎵 Test audio playing');
+                            } else if (message.action === 'stop') {
+                                showAudioActivity('🔇 Audio stopped');
+                                // Stop any currently playing audio
+                                stopAllAudio();
+                            } else if (message.action === 'pause') {
+                                showAudioActivity('⏸️ Audio paused');
+                                stopAllAudio();
+                            }
+                            break;
+                            
+                        case 'broadcast':
+                            addMessage('teacher', ` Teacher: ${message.message}`);
+                            break;
+                            
+                        case 'system_announcement':
+                            addMessage('system', ` ${message.message}`);
+                            break;
+                            
+                        case 'chat':
+                            if (message.user !== studentName) {
+                                const messageType = message.user === 'Teacher' ? 'teacher' : 'chat';
+                                addMessage(messageType, `${message.user}: ${message.message}`);
+                            }
+                            break;
+                            
+                        case 'participant_joined':
+                        case 'participant_left':
+                            if (message.user !== studentName) {
+                                addMessage('system', `${message.user} ${message.type.includes('joined') ? 'joined' : 'left'} the session`);
+                            }
+                            break;
+                            
+                        case 'error':
+                            addMessage('system', `Error: ${message.message}`);
+                            break;
+                    }
+                } catch (e) {
+                    console.error('Error parsing message:', e);
+                }
+            };
+
+            ws.onclose = function(event) {
+                console.log('WebSocket disconnected. Code:', event.code, 'Reason:', event.reason);
+                updateConnectionStatus(false);
+                addMessage('system', `Disconnected from session (Code: ${event.code})`);
+                hideAudioVisualization();
+                
+                if (event.code !== 1000 && event.code !== 1001) {
+                    // Abnormal closure
+                    alert(`Connection closed unexpectedly. Code: ${event.code}`);
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                updateConnectionStatus(false);
+                addMessage('system', 'Connection error occurred - Check if backend server is running');
+                alert('WebSocket connection failed. Please check:\n1. Backend server is running on ' + WS_BASE + '\n2. Your phone is on the same network\n3. Firewall is not blocking the connection');
+            };
+        }
+
+        function disconnectFromSession() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            currentSessionId = null;
+            handRaised = false;
+            updateConnectionStatus(false);
+            hideAudioVisualization();
+        }
+
+        async function handleAudioFile(audioData, filename, mimeType) {
+            // Show visual feedback
+            showAudioActivity(`Playing: ${filename}`);
+            console.log('Received audio file:', filename, 'Type:', mimeType, 'Size:', audioData.length);
+            
+            try {
+                // Convert base64 to ArrayBuffer
+                const binaryString = atob(audioData);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                // Create audio blob and play
+                const audioBlob = new Blob([bytes], { type: mimeType });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                const audio = new Audio();
+                audio.src = audioUrl;
+                audio.volume = 1.0;
+                
+                // Add file info to visualization
+                const visualization = document.getElementById('audioVisualization');
+                visualization.innerHTML = `🎵 Playing: ${filename}`;
+                visualization.style.background = '#e8f5e8';
+                
+                audio.onloadeddata = () => {
+                    console.log('Audio file loaded, starting playback');
+                    audio.play().then(() => {
+                        console.log('Audio file playing successfully');
+                        addMessage('system', `🎵 Playing audio: ${filename}`);
+                    }).catch(e => {
+                        console.log('Audio file play failed:', e.message);
+                        addMessage('system', `❌ Failed to play: ${filename}`);
+                    });
+                };
+                
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                    visualization.innerHTML = 'Listening for teacher audio...';
+                    visualization.style.background = '#f0f0f0';
+                    addMessage('system', `✅ Finished playing: ${filename}`);
+                };
+                
+                audio.onerror = (e) => {
+                    console.log('Audio file error:', e.target.error ? e.target.error.message : 'Unknown error');
+                    URL.revokeObjectURL(audioUrl);
+                    visualization.innerHTML = 'Audio playback error';
+                    visualization.style.background = '#ffeeee';
+                    addMessage('system', `❌ Error playing: ${filename}`);
+                };
+                
+            } catch (error) {
+                console.log('Audio file handling error:', error.message);
+                addMessage('system', `❌ Error handling audio file: ${filename}`);
+            }
+        }
+
+        async function handleAudioChunk(audioData, mimeType = 'audio/webm') {
+            // Show visual feedback
+            showAudioActivity('Teacher is speaking');
+            console.log('Received audio chunk:', mimeType, 'Size:', audioData.length);
+            const dbg = document.getElementById('audioDebug');
+            if (dbg) dbg.textContent = `Last chunk: ${mimeType || 'n/a'} | ${audioData.length} bytes`;
+            
+            try {
+                // Convert base64 to ArrayBuffer
+                const binaryString = atob(audioData);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const effectiveMime = mimeType || 'audio/webm;codecs=opus';
+
+                // Prefer MSE if supported for seamless streaming
+                if (window.MediaSource && MediaSource.isTypeSupported && MediaSource.isTypeSupported(effectiveMime)) {
+                    if (!mediaSource) {
+                        try {
+                            initMSE(effectiveMime);
+                        } catch (e) {
+                            console.log('MSE init failed, falling back to blob playback:', e.message);
+                        }
+                    }
+                    if (mediaSource && sourceBuffer) {
+                        mseQueue.push(bytes.buffer);
+                        appendFromMSEQueue();
+                        return;
+                    }
+                }
+
+                // Fallback: Blob + queued HTMLAudio playback
+                const audioBlob = new Blob([bytes], { type: effectiveMime });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                enqueueAndPlay(audioUrl);
+                
+            } catch (error) {
+                console.log('Audio handling error:', error.message);
+            }
+        }
+        
+        function playAudioBuffer(audioBuffer) {
+            try {
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.destination);
+                source.start();
+                console.log('Audio buffer played successfully');
+            } catch (error) {
+                console.log('Audio buffer play error:', error.message);
+            }
+        }
+
+        // ---- Media Source Extensions (MSE) helpers ----
+        function initMSE(mime) {
+            mseMime = mime;
+            mediaSource = new MediaSource();
+            const live = document.getElementById('liveAudio');
+            live.src = URL.createObjectURL(mediaSource);
+            mediaSource.addEventListener('sourceopen', () => {
+                try {
+                    sourceBuffer = mediaSource.addSourceBuffer(mime);
+                    // Sequence mode to append one segment after another
+                    if ('mode' in sourceBuffer) sourceBuffer.mode = 'sequence';
+                    sourceBuffer.addEventListener('updateend', appendFromMSEQueue);
+                    mseOpen = true;
+                    appendFromMSEQueue();
+                } catch (e) {
+                    console.log('addSourceBuffer failed:', e.message);
+                }
+            }, { once: true });
+        }
+
+        function appendFromMSEQueue() {
+            if (!sourceBuffer || sourceBuffer.updating) return;
+            if (mseQueue.length === 0) return;
+            try {
+                const chunk = mseQueue.shift();
+                sourceBuffer.appendBuffer(chunk);
+            } catch (e) {
+                console.log('appendBuffer error:', e.message);
+            }
+        }
+        
+        function stopAllAudio() {
+            // Stop any currently playing audio elements
+            const audioElements = document.querySelectorAll('audio');
+            audioElements.forEach(audio => {
+                if (!audio.paused) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+            });
+            console.log('All audio stopped');
+        }
+        
+        function pauseAudioAtPosition(position) {
+            // Pause the current file audio at specific position
+            if (currentFileAudio && !currentFileAudio.paused) {
+                currentFileAudio.pause();
+                if (position !== undefined && position !== null) {
+                    currentFileAudio.currentTime = position;
+                }
+                console.log(`Audio paused at position: ${position || currentFileAudio.currentTime}s`);
+            }
+            
+            // Also pause any other active audio
+            activeAudioElements.forEach(audio => {
+                if (audio && !audio.paused) {
+                    audio.pause();
+                    if (position !== undefined && position !== null) {
+                        audio.currentTime = position;
+                    }
+                }
+            });
+        }
+        
+        function resumeAudioFromPosition(position) {
+            // Resume the current file audio from specific position
+            if (currentFileAudio) {
+                if (position !== undefined && position !== null) {
+                    currentFileAudio.currentTime = position;
+                }
+                
+                currentFileAudio.play().then(() => {
+                    console.log(`Audio resumed from position: ${currentFileAudio.currentTime}s`);
+                }).catch(e => {
+                    console.log('Failed to resume audio:', e.message);
+                });
+            }
+            
+            // Also try to resume other active audio
+            activeAudioElements.forEach(audio => {
+                if (audio && audio.paused) {
+                    if (position !== undefined && position !== null) {
+                        audio.currentTime = position;
+                    }
+                    audio.play().catch(e => {
+                        console.log('Failed to resume audio element:', e.message);
+                    });
+                }
+            });
+        }
+        
+        async function playAudioBlob(bytes, mimeType) {
+            try {
+                // Create blob and audio element
+                const audioBlob = new Blob([bytes], { type: mimeType });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Create a temporary audio element
+                const audio = new Audio();
+                audio.src = audioUrl;
+                audio.volume = 1.0;
+                
+                // Clean up URL when done
+                audio.onended = () => URL.revokeObjectURL(audioUrl);
+                audio.onerror = () => URL.revokeObjectURL(audioUrl);
+                
+                // Try to play
+                await audio.play();
+                console.log('Audio blob played via HTML5 audio');
+                
+            } catch (error) {
+                console.log('Audio blob play error:', error.message);
+            }
+        }
+        
+        async function initializeAudioContext() {
+            try {
+                // Create audio context
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                // Try to resume context (this requires user interaction)
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                    console.log('Audio context resumed - ready for playback');
+                    addMessage('system', 'Audio playback enabled - you will hear teacher\'s voice');
+                    const btn = document.getElementById('enableAudioBtn');
+                    if (btn) btn.style.display = 'none';
+                } else {
+                    console.log('Audio context ready');
+                    const btn = document.getElementById('enableAudioBtn');
+                    if (btn) btn.style.display = 'none';
+                }
+            } catch (error) {
+                console.log('Audio context initialization failed:', error.message);
+                addMessage('system', 'Click anywhere on the page to enable audio playback');
+                
+                // Add click listener to enable audio
+                document.addEventListener('click', async () => {
+                    try {
+                        if (audioContext && audioContext.state === 'suspended') {
+                            await audioContext.resume();
+                            addMessage('system', 'Audio playback now enabled');
+                            const btn = document.getElementById('enableAudioBtn');
+                            if (btn) btn.style.display = 'none';
+                        }
+                    } catch (e) {
+                        console.log('Failed to enable audio:', e.message);
+                    }
+                }, { once: true });
+            }
+        }
+
+        // Enable Audio button handler
+        document.addEventListener('DOMContentLoaded', function(){
+            const btn = document.getElementById('enableAudioBtn');
+            if (btn) btn.addEventListener('click', () => { initializeAudioContext(); });
+        });
+
+        function showAudioActivity(message) {
+            const visualization = document.getElementById('audioVisualization');
+            visualization.style.background = '#e8f5e8';
+            visualization.innerHTML = message + ' ●●●';
+            
+            // Add some animation
+            let dots = 3;
+            const interval = setInterval(() => {
+                dots = (dots % 3) + 1;
+                visualization.innerHTML = message + ' ' + '●'.repeat(dots);
+            }, 300);
+            
+            setTimeout(() => {
+                clearInterval(interval);
+                visualization.style.background = '#f0f0f0';
+                visualization.innerHTML = 'Listening for teacher audio...';
+            }, 2000);
+        }
+
+        function showAudioVisualization() {
+            const visualization = document.getElementById('audioVisualization');
+            visualization.innerHTML = 'Connected - Listening for teacher audio...';
+            visualization.style.background = '#e6f3ff';
+        }
+
+        function hideAudioVisualization() {
+            const visualization = document.getElementById('audioVisualization');
+            visualization.innerHTML = 'Disconnected from session';
+            visualization.style.background = '#ffeeee';
+        }
+
+        function toggleRaiseHand() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to session');
+                return;
+            }
+
+            handRaised = !handRaised;
+            const btn = document.getElementById('raiseHandBtn');
+            
+            if (handRaised) {
+                btn.style.background = 'orange';
+                btn.innerHTML = 'Hand Raised!';
+                ws.send(JSON.stringify({
+                    type: 'raise_hand',
+                    user: studentName
+                }));
+                addMessage('system', 'Hand raised - waiting for teacher');
+            } else {
+                btn.style.background = '';
+                btn.innerHTML = 'Raise Hand';
+                ws.send(JSON.stringify({
+                    type: 'lower_hand',
+                    user: studentName
+                }));
+                addMessage('system', 'Hand lowered');
+            }
+        }
+
+        function toggleQuestionForm() {
+            const form = document.getElementById('questionForm');
+            if (form.style.display === 'none') {
+                form.style.display = 'block';
+                document.getElementById('questionText').focus();
+            } else {
+                form.style.display = 'none';
+            }
+        }
+
+        function sendQuestion() {
+            const questionText = document.getElementById('questionText').value.trim();
+            
+            if (!questionText) {
+                alert('Please enter a question');
+                return;
+            }
+
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to session');
+                return;
+            }
+
+            ws.send(JSON.stringify({
+                type: 'question',
+                question: questionText,
+                user: studentName
+            }));
+
+            addMessage('system', ` Question sent: ${questionText}`);
+            document.getElementById('questionText').value = '';
+            document.getElementById('questionForm').style.display = 'none';
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (message && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'chat',
+                    message: message,
+                    user: studentName
+                }));
+                
+                addMessage('chat', `You: ${message}`);
+                messageInput.value = '';
+            }
+        }
+
+        function handleMessageKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            
+            if (connected) {
+                status.textContent = `Connected to session ${currentSessionId}`;
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                status.textContent = 'Not connected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+
+        function addMessage(type, content) {
+            const messages = document.getElementById('messages');
+            const message = document.createElement('div');
+            message.style.marginBottom = '10px';
+            message.style.padding = '5px';
+            message.style.border = '1px solid #ccc';
+            
+            const now = new Date().toLocaleTimeString();
+            message.innerHTML = `
+                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">${now}</div>
+                <div>${content}</div>
+            `;
+            
+            messages.appendChild(message);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (ws) {
+                ws.close();
+            }
+        });
+    </script>
+</body>
+</html>

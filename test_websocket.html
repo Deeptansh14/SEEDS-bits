@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEEDS WebSocket Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .teacher { background-color: #e8f5e8; }
+        .student { background-color: #e8f0ff; }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        input, textarea, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background-color: #fafafa;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .chat-message { background-color: #e3f2fd; }
+        .audio-message { background-color: #fff3e0; }
+        .system-message { background-color: #f3e5f5; }
+        .error-message { background-color: #ffebee; color: red; }
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌱 SEEDS - Real-time Audio Communication Test</h1>
+        
+        <!-- Authentication Section -->
+        <div class="section">
+            <h3>🔐 Authentication</h3>
+            <input type="text" id="phoneNumber" placeholder="Phone Number" value="1234567890">
+            <input type="password" id="password" placeholder="Password" value="testpass123">
+            <select id="roleSelect">
+                <option value="teacher">Teacher</option>
+                <option value="student">Student</option>
+            </select>
+            <button onclick="register()">Register</button>
+            <button onclick="login()">Login</button>
+            <button onclick="createSession()" id="createSessionBtn" disabled>Create Session</button>
+            <div>
+                <strong>Token:</strong> <span id="tokenDisplay">Not authenticated</span>
+            </div>
+        </div>
+
+        <!-- WebSocket Connection -->
+        <div class="section">
+            <h3>🔌 WebSocket Connection</h3>
+            <input type="number" id="sessionId" placeholder="Session ID" value="1">
+            <button onclick="connectWebSocket()" id="connectBtn" disabled>Connect to Session</button>
+            <button onclick="disconnectWebSocket()" id="disconnectBtn" disabled>Disconnect</button>
+            <div>
+                <strong>Status:</strong> <span id="connectionStatus">Disconnected</span>
+            </div>
+        </div>
+
+        <!-- Teacher Controls -->
+        <div class="section teacher" id="teacherControls" style="display:none;">
+            <h3>👩‍🏫 Teacher Controls</h3>
+            
+            <!-- Audio Upload -->
+            <div>
+                <h4>Upload Audio File</h4>
+                <input type="file" id="audioFile" accept="audio/*">
+                <input type="text" id="audioTitle" placeholder="Audio Title">
+                <input type="text" id="audioDescription" placeholder="Audio Description">
+                <button onclick="uploadAudio()">Upload Audio</button>
+            </div>
+
+            <!-- Audio Playback Controls -->
+            <div class="audio-controls">
+                <h4>Audio Playback:</h4>
+                <select id="audioSelect">
+                    <option value="">Select audio file...</option>
+                </select>
+                <button onclick="playSelectedAudio()">Play Audio</button>
+                <button onclick="pauseAudio()">Pause</button>
+                <button onclick="resumeAudio()">Resume</button>
+                <button onclick="stopAudio()">Stop</button>
+            </div>
+
+            <!-- Real-time Audio (Microphone) -->
+            <div class="audio-controls">
+                <h4>Live Audio:</h4>
+                <button onclick="startMicrophone()" id="micBtn">Start Microphone</button>
+                <button onclick="stopMicrophone()" id="stopMicBtn" disabled>Stop Microphone</button>
+            </div>
+        </div>
+
+        <!-- Student Controls -->
+        <div class="section student" id="studentControls" style="display:none;">
+            <h3>👨‍🎓 Student Controls</h3>
+            <div class="audio-controls">
+                <button onclick="raiseHand()">✋ Raise Hand</button>
+                <input type="text" id="questionText" placeholder="Ask a question...">
+                <button onclick="askQuestion()">❓ Ask Question</button>
+            </div>
+            <div>
+                <audio id="audioPlayer" controls style="width: 100%; margin: 10px 0;"></audio>
+            </div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="section">
+            <h3>💬 Chat & Messages</h3>
+            <input type="text" id="chatInput" placeholder="Type a message..." style="width: 70%;">
+            <button onclick="sendChatMessage()">Send</button>
+            <div id="messages"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let token = null;
+        let currentRole = null;
+        let isRecording = false;
+        let mediaRecorder = null;
+        let audioChunks = [];
+
+        // Authentication functions
+        async function register() {
+            const phone = document.getElementById('phoneNumber').value;
+            const password = document.getElementById('password').value;
+            const role = document.getElementById('roleSelect').value;
+            
+            try {
+                const response = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: `Test ${role}`, phone_number: phone, role, password })
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    addMessage(`✅ Registered successfully as ${role}: ${data.name}`, 'system');
+                } else {
+                    addMessage(`❌ Registration failed: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                addMessage(`❌ Registration error: ${error.message}`, 'error');
+            }
+        }
+
+        async function login() {
+            const phone = document.getElementById('phoneNumber').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const formData = new FormData();
+                formData.append('username', phone);
+                formData.append('password', password);
+                
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    token = data.access_token;
+                    currentRole = document.getElementById('roleSelect').value;
+                    document.getElementById('tokenDisplay').textContent = token.substring(0, 30) + '...';
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('createSessionBtn').disabled = false;
+                    
+                    // Show appropriate controls
+                    if (currentRole === 'teacher') {
+                        document.getElementById('teacherControls').style.display = 'block';
+                        loadAudioFiles();
+                    } else {
+                        document.getElementById('studentControls').style.display = 'block';
+                    }
+                    
+                    addMessage(`✅ Logged in successfully as ${currentRole}`, 'system');
+                } else {
+                    addMessage(`❌ Login failed: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                addMessage(`❌ Login error: ${error.message}`, 'error');
+            }
+        }
+
+        async function createSession() {
+            if (!token) return;
+            
+            try {
+                const response = await fetch('/sessions', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ title: 'Test Session' })
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('sessionId').value = data.session_id;
+                    addMessage(`✅ Session created with ID: ${data.session_id}`, 'system');
+                } else {
+                    addMessage(`❌ Session creation failed: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                addMessage(`❌ Session creation error: ${error.message}`, 'error');
+            }
+        }
+
+        // WebSocket functions
+        function connectWebSocket() {
+            if (!token) {
+                addMessage('❌ Please login first', 'error');
+                return;
+            }
+            
+            const sessionId = document.getElementById('sessionId').value;
+            const wsUrl = `ws://localhost:8000/ws/${sessionId}?token=${token}`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function(event) {
+                document.getElementById('connectionStatus').textContent = 'Connected';
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                addMessage('🔌 Connected to WebSocket', 'system');
+            };
+            
+            ws.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                handleWebSocketMessage(message);
+            };
+            
+            ws.onclose = function(event) {
+                document.getElementById('connectionStatus').textContent = 'Disconnected';
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+                addMessage(`🔌 WebSocket closed: ${event.reason || 'Unknown reason'}`, 'system');
+            };
+            
+            ws.onerror = function(error) {
+                addMessage(`❌ WebSocket error: ${error}`, 'error');
+            };
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function handleWebSocketMessage(message) {
+            switch (message.type) {
+                case 'chat_message':
+                    addMessage(`💬 ${message.sender_name} (${message.sender_role}): ${message.content}`, 'chat');
+                    break;
+                case 'audio_state_changed':
+                    handleAudioStateChange(message.audio_state);
+                    break;
+                case 'audio_chunk':
+                    if (currentRole === 'student') {
+                        handleAudioChunk(message);
+                    }
+                    break;
+                case 'user_joined':
+                    addMessage(`👋 ${message.name} (${message.role}) joined the session`, 'system');
+                    break;
+                case 'user_left':
+                    addMessage(`👋 ${message.name} (${message.role}) left the session`, 'system');
+                    break;
+                case 'question':
+                    addMessage(`❓ Question from ${message.student_name}: ${message.content}`, 'system');
+                    break;
+                case 'hand_raised':
+                    addMessage(`✋ ${message.student_name} raised their hand`, 'system');
+                    break;
+                default:
+                    addMessage(`📩 ${message.type}: ${JSON.stringify(message)}`, 'system');
+            }
+        }
+
+        function handleAudioStateChange(audioState) {
+            if (audioState.playing && currentRole === 'student') {
+                addMessage(`🎵 Now playing: ${audioState.audio_title}`, 'audio');
+                const audioPlayer = document.getElementById('audioPlayer');
+                audioPlayer.src = audioState.audio_url;
+                audioPlayer.play();
+            } else if (!audioState.playing && currentRole === 'student') {
+                addMessage(`⏸️ Audio stopped`, 'audio');
+                const audioPlayer = document.getElementById('audioPlayer');
+                audioPlayer.pause();
+            }
+        }
+
+        function handleAudioChunk(message) {
+            // In a real implementation, you would decode and play the audio chunk
+            addMessage(`🎤 Live audio from ${message.sender_name}`, 'audio');
+        }
+
+        // Teacher functions
+        async function uploadAudio() {
+            const fileInput = document.getElementById('audioFile');
+            const title = document.getElementById('audioTitle').value;
+            const description = document.getElementById('audioDescription').value;
+            
+            if (!fileInput.files[0] || !title) {
+                addMessage('❌ Please select a file and enter a title', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('title', title);
+            formData.append('description', description);
+            
+            try {
+                const response = await fetch('/audio/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    addMessage(`✅ Audio uploaded: ${data.title}`, 'system');
+                    loadAudioFiles();
+                } else {
+                    addMessage(`❌ Upload failed: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                addMessage(`❌ Upload error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadAudioFiles() {
+            try {
+                const response = await fetch('/audio/list', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    const select = document.getElementById('audioSelect');
+                    select.innerHTML = '<option value="">Select audio file...</option>';
+                    
+                    data.audio_files.forEach(file => {
+                        const option = document.createElement('option');
+                        option.value = file.audio_id;
+                        option.textContent = file.title;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                addMessage(`❌ Error loading audio files: ${error.message}`, 'error');
+            }
+        }
+
+        function playSelectedAudio() {
+            const audioId = document.getElementById('audioSelect').value;
+            if (!audioId || !ws) return;
+            
+            ws.send(JSON.stringify({
+                type: 'play_audio',
+                audio_id: parseInt(audioId)
+            }));
+        }
+
+        function pauseAudio() {
+            if (!ws) return;
+            ws.send(JSON.stringify({ type: 'pause_audio' }));
+        }
+
+        function resumeAudio() {
+            if (!ws) return;
+            ws.send(JSON.stringify({ type: 'resume_audio' }));
+        }
+
+        function stopAudio() {
+            if (!ws) return;
+            ws.send(JSON.stringify({ type: 'stop_audio' }));
+        }
+
+        // Microphone functions
+        async function startMicrophone() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = function(event) {
+                    if (event.data.size > 0 && ws) {
+                        const reader = new FileReader();
+                        reader.onload = function() {
+                            const base64 = reader.result.split(',')[1];
+                            ws.send(JSON.stringify({
+                                type: 'audio_chunk',
+                                audio_data: base64
+                            }));
+                        };
+                        reader.readAsDataURL(event.data);
+                    }
+                };
+                
+                mediaRecorder.start(100); // Send chunks every 100ms
+                document.getElementById('micBtn').disabled = true;
+                document.getElementById('stopMicBtn').disabled = false;
+                addMessage('🎤 Microphone started', 'system');
+                
+            } catch (error) {
+                addMessage(`❌ Microphone error: ${error.message}`, 'error');
+            }
+        }
+
+        function stopMicrophone() {
+            if (mediaRecorder) {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                mediaRecorder = null;
+            }
+            document.getElementById('micBtn').disabled = false;
+            document.getElementById('stopMicBtn').disabled = true;
+            addMessage('🎤 Microphone stopped', 'system');
+        }
+
+        // Student functions
+        function raiseHand() {
+            if (!ws) return;
+            ws.send(JSON.stringify({ type: 'raise_hand' }));
+            addMessage('✋ Hand raised', 'system');
+        }
+
+        function askQuestion() {
+            const question = document.getElementById('questionText').value;
+            if (!question || !ws) return;
+            
+            ws.send(JSON.stringify({
+                type: 'question',
+                content: question
+            }));
+            
+            document.getElementById('questionText').value = '';
+            addMessage(`❓ Asked: ${question}`, 'system');
+        }
+
+        // Chat functions
+        function sendChatMessage() {
+            const message = document.getElementById('chatInput').value;
+            if (!message || !ws) return;
+            
+            ws.send(JSON.stringify({
+                type: 'chat_message',
+                content: message
+            }));
+            
+            document.getElementById('chatInput').value = '';
+        }
+
+        // Utility functions
+        function addMessage(text, type = 'system') {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Allow Enter key for chat
+        document.getElementById('chatInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        });
+    </script>
+</body>
+</html>

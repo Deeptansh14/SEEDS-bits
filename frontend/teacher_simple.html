@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEEDS - Teacher (Simple Test)</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { color: #333; text-align: center; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { background-color: #4285f4; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background-color: #3367d6; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; }
+        #connectionStatus { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        #messages { height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SEEDS Teacher Dashboard (Test Mode)</h1>
+        <p>Simple WebSocket testing without authentication</p>
+
+        <div class="section">
+            <h3>Connection Setup</h3>
+            <div>
+                <label for="serverAddress">Server Address:</label>
+                <input type="text" id="serverAddress" placeholder="e.g., 192.168.152.211:8001" value="192.168.152.211:8001">
+            </div>
+            <div>
+                <label for="teacherName">Your Name:</label>
+                <input type="text" id="teacherName" placeholder="Enter your name" value="Teacher">
+            </div>
+            <div>
+                <label for="sessionId">Session ID:</label>
+                <input type="number" id="sessionId" placeholder="Enter session ID (e.g., 1)" value="1">
+            </div>
+            <button onclick="connectToSession()" id="connectBtn">Connect to Session</button>
+            <button onclick="disconnectFromSession()" id="disconnectBtn" disabled>Disconnect</button>
+            <div id="connectionStatus">Not connected</div>
+        </div>
+
+        <div class="section">
+            <!-- Audio Controls -->
+            <div>
+                <h3>Audio Controls</h3>
+                
+                <!-- Microphone Controls -->
+                <div>
+                    <label>Live Microphone:</label>
+                    <div>
+                        <button onclick="startMicrophone()" id="startMicBtn">Start Mic</button>
+                        <button onclick="stopMicrophone()" id="stopMicBtn" disabled> Stop Mic</button>
+                    </div>
+                    <div id="micStatus" style="display: none;"></div>
+                </div>
+
+                <!-- Audio File Broadcasting -->
+                <div>
+                    <label>Broadcast Audio File:</label>
+                    <div>
+                        <input type="file" id="audioFileInput" accept="audio/*" onchange="loadAudioFile()">
+                        <button onclick="playAudioFile()" id="playAudioBtn" disabled>▶ Play & Broadcast</button>
+                        <button onclick="pauseAudioFile()" id="pauseAudioBtn" disabled>⏸ Pause</button>
+                        <button onclick="stopAudioFile()" id="stopAudioBtn" disabled>⏹ Stop</button>
+                    </div>
+                    <div id="audioFileStatus" style="margin-top: 5px; font-size: 12px; color: #666;"></div>
+                    <audio id="audioPreview" controls style="width: 100%; margin-top: 10px; display: none;"></audio>
+                </div>
+            </div>
+
+            <!-- Broadcasting -->
+            <div>
+                <h3>Broadcasting</h3>
+                <div>
+                    <label for="broadcastMessage">Broadcast Message:</label>
+                    <input type="text" id="broadcastMessage" placeholder="Message to all students">
+                    <button onclick="broadcastMessage()">Send to All Students</button>
+                </div>
+                
+                <div>
+                    <label>Quick Actions:</label>
+                    <button onclick="sendSystemMessage('Session started')">Start Session</button>
+                    <button onclick="sendSystemMessage('Session ended')"> End Session</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div>
+            <h3> Real-time Communication</h3>
+            <div id="messages" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;"></div>
+            <div>
+                <input type="text" id="messageInput" placeholder="Send message..." onkeypress="handleMessageKeyPress(event)">
+                <button onclick="sendMessage()">Send Message</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let teacherName = 'Teacher';
+        let currentSessionId = null;
+    let mediaRecorder = null;
+    let isRecording = false;
+    let recordingInterval = null;
+        let audioElement = null;
+        let isPlayingFile = false;
+        let audioFileData = null;
+        let audioBroadcastInterval = null;
+        let currentAudioElement = null;
+
+        const WS_BASE = 'ws://192.168.152.211:8001';
+
+        function connectToSession() {
+            const sessionId = document.getElementById('sessionId').value;
+            const name = document.getElementById('teacherName').value;
+            const serverAddress = document.getElementById('serverAddress').value;
+            
+            if (!sessionId) {
+                alert('Please enter a session ID');
+                return;
+            }
+            
+            if (!name) {
+                alert('Please enter your name');
+                return;
+            }
+            
+            if (!serverAddress) {
+                alert('Please enter server address');
+                return;
+            }
+
+            teacherName = name;
+            currentSessionId = sessionId;
+            
+            if (ws) {
+                ws.close();
+            }
+
+            // Build WebSocket URL from user input
+            const wsUrl = `ws://${serverAddress}/ws/${sessionId}`;
+            console.log('Connecting to:', wsUrl);
+            
+            // Connect without token for testing
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = function() {
+                console.log('WebSocket connected');
+                updateConnectionStatus(true);
+                addMessage('system', `Connected to session ${sessionId} as ${teacherName}`);
+                
+                // Send initial message to identify as teacher
+                ws.send(JSON.stringify({
+                    type: 'user_info',
+                    name: teacherName,
+                    role: 'teacher'
+                }));
+            };
+
+            ws.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    console.log('Received message:', message);
+
+                    switch(message.type) {
+                        case 'participant_joined':
+                            addMessage('system', `${message.user || 'Student'} joined the session`);
+                            break;
+                        case 'participant_left':
+                            addMessage('system', `${message.user || 'Student'} left the session`);
+                            break;
+                        case 'hand_raised':
+                            addMessage('hand-raised', `${message.user} raised their hand`);
+                            break;
+                        case 'question':
+                            addMessage('question', ` ${message.user}: ${message.question}`);
+                            break;
+                        case 'chat':
+                            if (message.user !== teacherName) {
+                                addMessage('chat', `${message.user}: ${message.message}`);
+                            }
+                            break;
+                        case 'audio_chunk':
+                            // Play back teacher's own audio chunks to monitor what students hear
+                            if (message.user === teacherName) {
+                                playAudioChunkLocally(message.data, message.mimeType);
+                            }
+                            break;
+                        case 'audio_file':
+                            // Play back teacher's audio file locally to monitor
+                            if (message.user === teacherName) {
+                                console.log('Received own audio file broadcast');
+                            }
+                            break;
+                        case 'error':
+                            addMessage('system', `Error: ${message.message}`);
+                            break;
+                    }
+                } catch (e) {
+                    console.error('Error parsing message:', e);
+                }
+            };
+
+            ws.onclose = function() {
+                console.log('WebSocket disconnected');
+                updateConnectionStatus(false);
+                addMessage('system', 'Disconnected from session');
+                
+                // Clean up audio when disconnected
+                if (mediaRecorder && isRecording) {
+                    stopMicrophone();
+                }
+                
+                if (isPlayingFile) {
+                    stopAudioFile();
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                updateConnectionStatus(false);
+                addMessage('system', 'Connection error occurred');
+            };
+        }
+
+        function disconnectFromSession() {
+            // Stop any ongoing audio activities
+            if (mediaRecorder && isRecording) {
+                stopMicrophone();
+            }
+            
+            if (isPlayingFile) {
+                stopAudioFile();
+            }
+            
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            currentSessionId = null;
+            updateConnectionStatus(false);
+            
+            // Stop microphone if recording
+            if (isRecording) {
+                stopMicrophone();
+            }
+        }
+
+        async function startMicrophone() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Try different MIME types for better browser compatibility
+                let mimeType = 'audio/webm;codecs=opus';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'audio/webm';
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        mimeType = 'audio/mp4';
+                        if (!MediaRecorder.isTypeSupported(mimeType)) {
+                            mimeType = ''; // Let browser choose
+                        }
+                    }
+                }
+                
+                console.log('Using MIME type:', mimeType);
+                
+                mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+
+                let audioChunks = [];
+
+                mediaRecorder.ondataavailable = function(event) {
+                    if (event.data && event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = function() {
+                    try {
+                        if (audioChunks.length > 0 && ws && ws.readyState === WebSocket.OPEN) {
+                            const audioBlob = new Blob(audioChunks, { type: mimeType || 'audio/webm' });
+                            audioChunks = [];
+                            const reader = new FileReader();
+                            reader.onload = function() {
+                                const audioData = String(reader.result).split(',')[1];
+                                ws.send(JSON.stringify({
+                                    type: 'audio_chunk',
+                                    data: audioData,
+                                    mimeType: audioBlob.type,
+                                    user: teacherName
+                                }));
+                            };
+                            reader.readAsDataURL(audioBlob);
+                        }
+                        // Immediately restart if still recording
+                        if (isRecording) {
+                            try {
+                                mediaRecorder.start();
+                            } catch (e) {
+                                console.error('Failed to restart recorder:', e);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('onstop processing error:', e);
+                    }
+                };
+
+                // Start recorder and periodically stop to create self-contained chunks with headers
+                mediaRecorder.start();
+                recordingInterval = setInterval(() => {
+                    if (isRecording && mediaRecorder && mediaRecorder.state === 'recording') {
+                        try {
+                            mediaRecorder.stop();
+                        } catch (e) {
+                            console.error('Failed to stop recorder:', e);
+                        }
+                    } else if (!isRecording && recordingInterval) {
+                        clearInterval(recordingInterval);
+                        recordingInterval = null;
+                    }
+                }, 1500);
+                
+                isRecording = true;
+
+                document.getElementById('startMicBtn').disabled = true;
+                document.getElementById('stopMicBtn').disabled = false;
+                
+                const micStatus = document.getElementById('micStatus');
+                micStatus.innerHTML = 'Recording and broadcasting...';
+                micStatus.style.display = 'block';
+
+                addMessage('system', 'Microphone started - Students can now hear you');
+
+            } catch (error) {
+                console.error('Microphone error:', error);
+                alert('Failed to access microphone. Please check permissions.');
+            }
+        }
+
+        function stopMicrophone() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+                
+                // Clear interval timer
+                if (recordingInterval) {
+                    clearInterval(recordingInterval);
+                    recordingInterval = null;
+                }
+
+                document.getElementById('startMicBtn').disabled = false;
+                document.getElementById('stopMicBtn').disabled = true;
+                
+                const micStatus = document.getElementById('micStatus');
+                micStatus.style.display = 'none';
+
+                addMessage('system', 'Microphone stopped');
+                
+                // Send stop message
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'audio_control',
+                        action: 'stop',
+                        user: teacherName
+                    }));
+                }
+            }
+        }
+
+        function playTestAudio() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'audio_control',
+                    action: 'play_test',
+                    message: 'Test audio playing',
+                    user: teacherName
+                }));
+                addMessage('system', ' Playing test audio for students');
+            } else {
+                alert('Not connected to session');
+            }
+        }
+
+        function stopTestAudio() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'audio_control',
+                    action: 'stop',
+                    user: teacherName
+                }));
+                addMessage('system', 'Audio stopped');
+            }
+        }
+
+        // Audio File Broadcasting Functions
+        function loadAudioFile() {
+            const fileInput = document.getElementById('audioFileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                return;
+            }
+            
+            // Check if it's an audio file
+            if (!file.type.startsWith('audio/')) {
+                alert('Please select an audio file');
+                return;
+            }
+            
+            const audioPreview = document.getElementById('audioPreview');
+            const fileStatus = document.getElementById('audioFileStatus');
+            
+            // Create URL for preview
+            const fileUrl = URL.createObjectURL(file);
+            audioPreview.src = fileUrl;
+            audioPreview.style.display = 'block';
+            
+            // Enable play button
+            document.getElementById('playAudioBtn').disabled = false;
+            
+            // Show file info
+            fileStatus.textContent = `Loaded: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            
+            // Store file data for broadcasting
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                audioFileData = e.target.result; // This will be base64 data URL
+                console.log('Audio file loaded for broadcasting');
+            };
+            reader.readAsDataURL(file);
+            
+            addMessage('system', `Audio file loaded: ${file.name}`);
+        }
+
+        function playAudioFile() {
+            if (!audioFileData) {
+                alert('Please select an audio file first');
+                return;
+            }
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to session');
+                return;
+            }
+            
+            const audioPreview = document.getElementById('audioPreview');
+            currentAudioElement = audioPreview;
+            
+            // Play locally for teacher
+            audioPreview.play().then(() => {
+                isPlayingFile = true;
+                
+                // Update buttons
+                document.getElementById('playAudioBtn').disabled = true;
+                document.getElementById('pauseAudioBtn').disabled = false;
+                document.getElementById('stopAudioBtn').disabled = false;
+                
+                // Send initial audio file to students
+                broadcastAudioFile();
+                
+                // Start play command for students
+                ws.send(JSON.stringify({
+                    type: 'audio_control',
+                    action: 'play',
+                    user: teacherName
+                }));
+                
+                // Monitor audio playback and stop when ended
+                audioPreview.onended = () => {
+                    stopAudioFile();
+                };
+                
+                addMessage('system', 'Playing audio file - Students can now hear it');
+                
+            }).catch(error => {
+                console.error('Error playing audio:', error);
+                alert('Failed to play audio file');
+            });
+        }
+
+        function pauseAudioFile() {
+            const audioPreview = document.getElementById('audioPreview');
+            
+            if (isPlayingFile && audioPreview && !audioPreview.paused) {
+                const currentTime = audioPreview.currentTime;
+                audioPreview.pause();
+                isPlayingFile = false;
+                
+                // Stop any ongoing broadcast
+                if (audioBroadcastInterval) {
+                    clearInterval(audioBroadcastInterval);
+                    audioBroadcastInterval = null;
+                }
+                
+                // Update buttons - enable play to resume
+                document.getElementById('playAudioBtn').disabled = false;
+                document.getElementById('pauseAudioBtn').disabled = true;
+                // Keep stop button enabled
+                
+                // Notify students to pause at the same position
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'audio_control',
+                        action: 'pause',
+                        currentTime: currentTime,
+                        user: teacherName
+                    }));
+                }
+                
+                addMessage('system', `Audio paused at ${Math.floor(currentTime)}s`);
+            }
+        }
+
+        function stopAudioFile() {
+            const audioPreview = document.getElementById('audioPreview');
+            
+            if (audioPreview) {
+                audioPreview.pause();
+                audioPreview.currentTime = 0;
+                audioPreview.onended = null; // Remove event listener
+            }
+            
+            isPlayingFile = false;
+            currentAudioElement = null;
+            
+            // Stop any ongoing broadcast
+            if (audioBroadcastInterval) {
+                clearInterval(audioBroadcastInterval);
+                audioBroadcastInterval = null;
+            }
+            
+            // Update buttons
+            document.getElementById('playAudioBtn').disabled = false;
+            document.getElementById('pauseAudioBtn').disabled = true;
+            document.getElementById('stopAudioBtn').disabled = true;
+            
+            // Notify students to stop
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'audio_control',
+                    action: 'stop',
+                    user: teacherName
+                }));
+            }
+            
+            addMessage('system', 'Audio stopped');
+        }
+
+        function broadcastAudioFile() {
+            if (!audioFileData || !ws || ws.readyState !== WebSocket.OPEN) {
+                return;
+            }
+            
+            // Extract base64 data (remove data:audio/...;base64, prefix)
+            const base64Data = audioFileData.split(',')[1];
+            
+            // Send the complete audio file to students
+            ws.send(JSON.stringify({
+                type: 'audio_file',
+                data: base64Data,
+                filename: document.getElementById('audioFileInput').files[0].name,
+                mimeType: document.getElementById('audioFileInput').files[0].type,
+                user: teacherName
+            }));
+            
+            console.log('Audio file broadcasted to students');
+        }
+
+        function broadcastMessage() {
+            const message = document.getElementById('broadcastMessage').value.trim();
+            if (!message) {
+                alert('Please enter a message');
+                return;
+            }
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'broadcast',
+                    message: message,
+                    user: teacherName
+                }));
+                
+                addMessage('system', ` Broadcasted: ${message}`);
+                document.getElementById('broadcastMessage').value = '';
+            } else {
+                alert('Not connected to session');
+            }
+        }
+
+        function sendSystemMessage(message) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'system_announcement',
+                    message: message,
+                    user: teacherName
+                }));
+                addMessage('system', ` ${message}`);
+            } else {
+                alert('Not connected to session');
+            }
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (message && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'chat',
+                    message: message,
+                    user: teacherName
+                }));
+                
+                addMessage('chat', `You: ${message}`);
+                messageInput.value = '';
+            }
+        }
+
+        function handleMessageKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            
+            if (connected) {
+                status.textContent = `Connected to session ${currentSessionId}`;
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                status.textContent = 'Not connected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+
+        function addMessage(type, content) {
+            const messages = document.getElementById('messages');
+            const message = document.createElement('div');
+            message.style.marginBottom = '10px';
+            message.style.padding = '5px';
+            message.style.border = '1px solid #ccc';
+            
+            const now = new Date().toLocaleTimeString();
+            message.innerHTML = `
+                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">${now}</div>
+                <div>${content}</div>
+            `;
+            
+            messages.appendChild(message);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (isRecording) {
+                stopMicrophone();
+            }
+            if (ws) {
+                ws.close();
+            }
+        });
+    </script>
+</body>
+</html>

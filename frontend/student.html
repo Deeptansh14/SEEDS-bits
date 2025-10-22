@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEEDS - Student Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .login-section, .dashboard {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .dashboard {
+            display: none;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        input, select, textarea, button {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #74b9ff;
+        }
+
+        button {
+            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .control-card {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .control-card h3 {
+            margin-bottom: 15px;
+            color: #74b9ff;
+            border-bottom: 2px solid #74b9ff;
+            padding-bottom: 5px;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .audio-player {
+            width: 100%;
+            margin-top: 10px;
+            border-radius: 8px;
+        }
+
+        .messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: white;
+            border-left: 4px solid #74b9ff;
+        }
+
+        .message.system {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+
+        .message.teacher {
+            background: #d1ecf1;
+            border-left-color: #17a2b8;
+        }
+
+        .message-header {
+            font-weight: 600;
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .interaction-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .raise-hand {
+            background: linear-gradient(135deg, #fdcb6e 0%, #e17055 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .raise-hand.active {
+            animation: pulse-hand 1s infinite;
+        }
+
+        @keyframes pulse-hand {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .question-form {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .question-form.active {
+            display: block;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .volume-control {
+            margin-top: 10px;
+        }
+
+        .volume-control input[type="range"] {
+            width: 100%;
+        }
+
+        .session-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #2196f3;
+        }
+
+        .live-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #4caf50;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse-live 2s infinite;
+        }
+
+        @keyframes pulse-live {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        .audio-visualization {
+            height: 50px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌱 SEEDS Student Portal</h1>
+            <p>Join educational sessions and interact with your teachers</p>
+        </div>
+
+        <!-- Login Section -->
+        <div id="loginSection" class="login-section">
+            <h2>Student Login</h2>
+            <div class="form-group">
+                <label for="phone">Phone Number:</label>
+                <input type="tel" id="phone" placeholder="Enter your phone number" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" placeholder="Enter your password" required>
+            </div>
+            <button onclick="login()">Login</button>
+            <div id="loginStatus" class="status disconnected hidden">Login failed</div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div id="dashboard" class="dashboard">
+            <div class="control-panel">
+                <!-- Session Selection -->
+                <div class="control-card">
+                    <h3>📚 Join Session</h3>
+                    <div class="form-group">
+                        <label for="sessionSelect">Available Sessions:</label>
+                        <select id="sessionSelect" onchange="selectSession()">
+                            <option value="">Select a session to join</option>
+                        </select>
+                    </div>
+                    
+                    <div id="sessionInfo" class="session-info hidden">
+                        <div id="sessionTitle"></div>
+                        <div id="sessionStatus"></div>
+                    </div>
+
+                    <div id="connectionStatus" class="status disconnected">Not connected</div>
+                </div>
+
+                <!-- Audio Controls -->
+                <div class="control-card">
+                    <h3>🎵 Audio</h3>
+                    
+                    <div id="liveAudioSection" class="hidden">
+                        <label>Live Audio from Teacher:</label>
+                        <div class="audio-visualization" id="audioVisualization">
+                            <span class="live-indicator"></span>
+                            Listening for teacher audio...
+                        </div>
+                    </div>
+
+                    <div id="audioPlayerSection" class="hidden">
+                        <label>Audio Playback:</label>
+                        <audio id="audioPlayer" class="audio-player" controls></audio>
+                    </div>
+
+                    <div class="volume-control">
+                        <label for="volumeSlider">Volume:</label>
+                        <input type="range" id="volumeSlider" min="0" max="100" value="50" oninput="adjustVolume()">
+                        <span id="volumeDisplay">50%</span>
+                    </div>
+                </div>
+
+                <!-- Interaction Controls -->
+                <div class="control-card">
+                    <h3>✋ Interaction</h3>
+                    
+                    <div class="interaction-buttons">
+                        <button class="raise-hand" onclick="toggleRaiseHand()" id="raiseHandBtn">
+                            🙋‍♂️ Raise Hand
+                        </button>
+                        <button onclick="toggleQuestionForm()" id="questionBtn">
+                            ❓ Ask Question
+                        </button>
+                    </div>
+
+                    <div class="question-form" id="questionForm">
+                        <div class="form-group">
+                            <label for="questionText">Your Question:</label>
+                            <textarea id="questionText" placeholder="Type your question here..." rows="3"></textarea>
+                        </div>
+                        <button onclick="sendQuestion()">Send Question</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages and Communication -->
+            <div class="control-card">
+                <h3>💬 Class Communication</h3>
+                <div id="messages" class="messages"></div>
+                <div class="form-group">
+                    <input type="text" id="messageInput" placeholder="Send message to class..." onkeypress="handleMessageKeyPress(event)">
+                    <button onclick="sendMessage()">Send Message</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentUser = null;
+        let currentSession = null;
+        let handRaised = false;
+        let audioContext = null;
+
+        const API_BASE = 'http://127.0.0.1:8000';
+        const WS_BASE = 'ws://127.0.0.1:8000';
+
+        async function login() {
+            const phone = document.getElementById('phone').value;
+            const password = document.getElementById('password').value;
+            const loginStatus = document.getElementById('loginStatus');
+
+            if (!phone || !password) {
+                showStatus(loginStatus, 'Please fill in all fields', false);
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('username', phone);
+                formData.append('password', password);
+
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.user.role !== 'student') {
+                        showStatus(loginStatus, 'Access denied. Students only.', false);
+                        return;
+                    }
+
+                    currentUser = data.user;
+                    localStorage.setItem('token', data.access_token);
+                    localStorage.setItem('user', JSON.stringify(currentUser));
+
+                    document.getElementById('loginSection').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'block';
+
+                    await loadSessions();
+
+                } else {
+                    const error = await response.json();
+                    showStatus(loginStatus, error.detail || 'Login failed', false);
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showStatus(loginStatus, 'Connection error', false);
+            }
+        }
+
+        async function loadSessions() {
+            try {
+                const response = await fetch(`${API_BASE}/sessions`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const sessions = await response.json();
+                    const sessionSelect = document.getElementById('sessionSelect');
+                    
+                    sessionSelect.innerHTML = '<option value="">Select a session to join</option>';
+                    
+                    sessions.filter(s => s.is_active).forEach(session => {
+                        const option = document.createElement('option');
+                        option.value = session.session_id;
+                        option.textContent = session.title;
+                        sessionSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Load sessions error:', error);
+            }
+        }
+
+        async function selectSession() {
+            const sessionId = document.getElementById('sessionSelect').value;
+            
+            if (sessionId) {
+                currentSession = sessionId;
+                
+                // Join the session
+                await joinSession(sessionId);
+                
+                // Connect to WebSocket
+                connectWebSocket(sessionId);
+                
+                // Update UI
+                const sessionInfo = document.getElementById('sessionInfo');
+                const sessionTitle = document.getElementById('sessionTitle');
+                const sessionStatus = document.getElementById('sessionStatus');
+                
+                sessionTitle.textContent = `Session: ${document.getElementById('sessionSelect').selectedOptions[0].text}`;
+                sessionStatus.innerHTML = '<span class="live-indicator"></span>Connected to session';
+                sessionInfo.classList.remove('hidden');
+                
+            } else {
+                if (ws) {
+                    ws.close();
+                }
+                currentSession = null;
+                document.getElementById('sessionInfo').classList.add('hidden');
+                updateConnectionStatus(false);
+            }
+        }
+
+        async function joinSession(sessionId) {
+            try {
+                const response = await fetch(`${API_BASE}/sessions/${sessionId}/join`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert(error.detail || 'Failed to join session');
+                }
+            } catch (error) {
+                console.error('Join session error:', error);
+                alert('Connection error');
+            }
+        }
+
+        function connectWebSocket(sessionId) {
+            if (ws) {
+                ws.close();
+            }
+
+            const token = localStorage.getItem('token');
+            ws = new WebSocket(`${WS_BASE}/ws/${sessionId}?token=${token}`);
+
+            ws.onopen = function() {
+                console.log('WebSocket connected');
+                updateConnectionStatus(true);
+                addMessage('system', `Connected to session`);
+                
+                // Show live audio section
+                document.getElementById('liveAudioSection').classList.remove('hidden');
+            };
+
+            ws.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                console.log('Received message:', message);
+
+                switch(message.type) {
+                    case 'session_ended':
+                        addMessage('system', 'Session has been ended by the teacher');
+                        if (ws) {
+                            ws.close();
+                        }
+                        currentSession = null;
+                        document.getElementById('sessionSelect').value = '';
+                        document.getElementById('sessionInfo').classList.add('hidden');
+                        document.getElementById('liveAudioSection').classList.add('hidden');
+                        break;
+                        
+                    case 'audio_chunk':
+                        // Handle real-time audio from teacher
+                        handleAudioChunk(message.data);
+                        break;
+                        
+                    case 'audio_control':
+                        // Handle audio playback control
+                        if (message.action === 'play' && message.audio_url) {
+                            playAudio(message.audio_url);
+                        }
+                        break;
+                        
+                    case 'chat':
+                        if (message.user_id !== currentUser.user_id) {
+                            const messageType = message.user === 'Teacher' ? 'teacher' : 'chat';
+                            addMessage(messageType, `${message.user}: ${message.message}`, message.user);
+                        }
+                        break;
+                        
+                    case 'participant_joined':
+                    case 'participant_left':
+                        if (message.user_id !== currentUser.user_id) {
+                            addMessage('system', message.message || `${message.user} ${message.type.split('_')[1]} the session`);
+                        }
+                        break;
+                }
+            };
+
+            ws.onclose = function() {
+                console.log('WebSocket disconnected');
+                updateConnectionStatus(false);
+                addMessage('system', 'Disconnected from session');
+                document.getElementById('liveAudioSection').classList.add('hidden');
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                updateConnectionStatus(false);
+            };
+        }
+
+        function handleAudioChunk(audioData) {
+            // Handle real-time audio chunks from teacher
+            try {
+                // This would typically involve Web Audio API for real-time playback
+                // For now, we'll just show visual feedback
+                const visualization = document.getElementById('audioVisualization');
+                visualization.style.background = '#e8f5e8';
+                visualization.innerHTML = '<span class="live-indicator"></span>Receiving live audio...';
+                
+                setTimeout(() => {
+                    visualization.style.background = '#f0f0f0';
+                    visualization.innerHTML = '<span class="live-indicator"></span>Listening for teacher audio...';
+                }, 200);
+                
+            } catch (error) {
+                console.error('Audio playback error:', error);
+            }
+        }
+
+        function playAudio(audioUrl) {
+            const audioPlayer = document.getElementById('audioPlayer');
+            const audioSection = document.getElementById('audioPlayerSection');
+            
+            audioPlayer.src = audioUrl;
+            audioSection.classList.remove('hidden');
+            audioPlayer.play();
+            
+            addMessage('system', '🎵 Audio file is now playing');
+        }
+
+        function toggleRaiseHand() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to session');
+                return;
+            }
+
+            handRaised = !handRaised;
+            const btn = document.getElementById('raiseHandBtn');
+            
+            if (handRaised) {
+                btn.classList.add('active');
+                btn.innerHTML = '🙋‍♂️ Hand Raised';
+                ws.send(JSON.stringify({
+                    type: 'raise_hand'
+                }));
+                addMessage('system', 'Hand raised - waiting for teacher response');
+            } else {
+                btn.classList.remove('active');
+                btn.innerHTML = '🙋‍♂️ Raise Hand';
+                addMessage('system', 'Hand lowered');
+            }
+        }
+
+        function toggleQuestionForm() {
+            const form = document.getElementById('questionForm');
+            form.classList.toggle('active');
+            
+            if (form.classList.contains('active')) {
+                document.getElementById('questionText').focus();
+            }
+        }
+
+        function sendQuestion() {
+            const questionText = document.getElementById('questionText').value.trim();
+            
+            if (!questionText) {
+                alert('Please enter a question');
+                return;
+            }
+
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to session');
+                return;
+            }
+
+            ws.send(JSON.stringify({
+                type: 'question',
+                question: questionText
+            }));
+
+            addMessage('system', `Question sent: ${questionText}`);
+            document.getElementById('questionText').value = '';
+            document.getElementById('questionForm').classList.remove('active');
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (message && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'chat',
+                    message: message
+                }));
+                
+                addMessage('chat', `You: ${message}`, 'You');
+                messageInput.value = '';
+            }
+        }
+
+        function handleMessageKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function adjustVolume() {
+            const volumeSlider = document.getElementById('volumeSlider');
+            const volumeDisplay = document.getElementById('volumeDisplay');
+            const audioPlayer = document.getElementById('audioPlayer');
+            
+            const volume = volumeSlider.value;
+            volumeDisplay.textContent = volume + '%';
+            audioPlayer.volume = volume / 100;
+        }
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            if (connected) {
+                status.className = 'status connected';
+                status.textContent = 'Connected to session';
+            } else {
+                status.className = 'status disconnected';
+                status.textContent = 'Not connected';
+            }
+        }
+
+        function addMessage(type, content, user = null) {
+            const messages = document.getElementById('messages');
+            const message = document.createElement('div');
+            message.className = `message ${type}`;
+            
+            const now = new Date().toLocaleTimeString();
+            message.innerHTML = `
+                <div class="message-header">${now}</div>
+                <div>${content}</div>
+            `;
+            
+            messages.appendChild(message);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function showStatus(element, message, success) {
+            element.textContent = message;
+            element.className = `status ${success ? 'connected' : 'disconnected'}`;
+            element.classList.remove('hidden');
+            
+            setTimeout(() => {
+                element.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if already logged in
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            
+            if (token && user) {
+                currentUser = JSON.parse(user);
+                if (currentUser.role === 'student') {
+                    document.getElementById('loginSection').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'block';
+                    loadSessions();
+                }
+            }
+
+            // Auto-refresh sessions every 30 seconds
+            setInterval(() => {
+                if (currentUser && document.getElementById('dashboard').style.display === 'block') {
+                    loadSessions();
+                }
+            }, 30000);
+        });
+    </script>
+</body>
+</html>
