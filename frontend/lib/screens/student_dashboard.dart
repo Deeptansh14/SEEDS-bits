@@ -182,148 +182,151 @@ class _StudentDashboardState extends State<StudentDashboard> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // User Info Card
-            Card(
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Welcome, ${currentUserName ?? 'Student'}!",
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "User ID: $currentUserId",
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Manual join section
-            Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Join Session by ID",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
+      body: SafeArea(
+        child: SingleChildScrollView(  // ← ADD THIS
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // User Info Card
+                Card(
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: sessionCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: "Session ID",
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.meeting_room),
-                            ),
+                        Text(
+                          "Welcome, ${currentUserName ?? 'Student'}!",
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            final idText = sessionCtrl.text.trim();
-                            if (idText.isEmpty) {
-                              TtsService.speak("Please enter a session ID");
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Please enter a session ID"),
-                                ),
-                              );
-                              return;
-                            }
-                            
-                            final sessionId = int.tryParse(idText);
-                            if (sessionId == null) {
-                              TtsService.speak("Invalid session ID");
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Please enter a valid number"),
-                                ),
-                              );
-                              return;
-                            }
-                            
-                            joinSession(sessionId);
-                          },
-                          icon: const Icon(Icons.login),
-                          label: const Text("Join"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "User ID: $currentUserId",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
                           ),
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Active sessions header
-            Row(
-              children: [
-                const Text(
-                  "Active Sessions",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
-                const SizedBox(width: 8),
-                if (sessions.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.teal,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${sessions.length}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                
+                const SizedBox(height: 20),
+                
+                // Manual join section
+                Card(
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Join Session by ID",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: sessionCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: "Session ID",
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.meeting_room),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                final idText = sessionCtrl.text.trim();
+                                if (idText.isEmpty) {
+                                  TtsService.speak("Please enter a session ID");
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("Please enter a session ID"),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                
+                                final sessionId = int.tryParse(idText);
+                                if (sessionId == null) {
+                                  TtsService.speak("Invalid session ID");
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("Please enter a valid number"),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                
+                                joinSession(sessionId);
+                              },
+                              icon: const Icon(Icons.login),
+                              label: const Text("Join"),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-              ],
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Active sessions list
-            Expanded(
-              child: sessions.isEmpty
-                  ? Center(
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Active sessions header
+                Row(
+                  children: [
+                    const Text(
+                      "Active Sessions",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    const SizedBox(width: 8),
+                    if (sessions.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.teal,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${sessions.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                
+                const SizedBox(height: 12),
+                
+                // Active sessions list - NO EXPANDED, just list items
+                if (sessions.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(40),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -348,81 +351,81 @@ class _StudentDashboardState extends State<StudentDashboard> {
                           ),
                         ],
                       ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadSessions,
-                      child: ListView.builder(
-                        itemCount: sessions.length,
-                        itemBuilder: (context, i) {
-                          final s = sessions[i];
-                          final sessionId = s['session_id'] ?? 0;
-                          final title = s['title'] ?? 'Untitled Session';
-                          final teacherName = s['teacher_name'] ?? 'Unknown';
-                          final participantCount = s['participant_count'] ?? 0;
-                          
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: 2,
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.all(16),
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.teal,
-                                child: Text(
-                                  '$sessionId',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.person, size: 16),
-                                      const SizedBox(width: 4),
-                                      Text('Teacher: $teacherName'),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.people, size: 16),
-                                      const SizedBox(width: 4),
-                                      Text('$participantCount participants'),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              trailing: ElevatedButton.icon(
-                                onPressed: () => joinSession(sessionId),
-                                icon: const Icon(Icons.login, size: 18),
-                                label: const Text("Join"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
                     ),
+                  )
+                else
+                  ...sessions.map((s) {
+                    final sessionId = s['session_id'] ?? 0;
+                    final title = s['title'] ?? 'Untitled Session';
+                    final teacherName = s['teacher_name'] ?? 'Unknown';
+                    final participantCount = s['participant_count'] ?? 0;
+                    
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      elevation: 2,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.teal,
+                          child: Text(
+                            '$sessionId',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(Icons.person, size: 16),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text('Teacher: $teacherName'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.people, size: 16),
+                                const SizedBox(width: 4),
+                                Text('$participantCount participants'),
+                              ],
+                            ),
+                          ],
+                        ),
+                        trailing: ElevatedButton.icon(
+                          onPressed: () => joinSession(sessionId),
+                          icon: const Icon(Icons.login, size: 18),
+                          label: const Text("Join"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  
+                const SizedBox(height: 20), // Bottom padding
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

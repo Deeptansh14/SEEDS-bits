@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   static const bool devMode = true; // Set to false for JWT mode
-  static const baseUrl = "http://127.0.0.1:8000"; // Change for emulator/device IP
+  static const baseUrl = "http://127.0.0.1:8000";    // Change for emulator/device IP
 
   // Build full URL for endpoint (synchronous)
   static Future<Uri> _buildUri(String path) async {

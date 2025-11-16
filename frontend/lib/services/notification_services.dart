@@ -183,20 +183,37 @@ class NotificationService {
   Future<void> _registerTokenWithBackend(String token, String deviceType) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      
+      // Save token locally first
       await prefs.setString('fcm_token', token);
+      print('[FCM] Token saved locally: ${token.substring(0, 20)}...');
+      
+      // Check if user is logged in
+      final userId = prefs.getInt('user_id');
+      if (userId == null) {
+        print('[FCM] User not logged in yet - will register token after login');
+        return; // Skip registration for now
+      }
       
       // Send to backend
-      final result = await ApiService.post(
-        '/users/fcm-token',
-        {'token': token, 'device_type': deviceType},
-        useAuth: true,
-      );
-      
-      if (result != null && result['ok'] == true) {
-        print('[FCM] Token registered with backend');
+      try {
+        final result = await ApiService.post(
+          '/users/fcm-token',
+          {'token': token, 'device_type': deviceType},
+          useAuth: true,
+        );
+        
+        if (result != null && result['ok'] == true) {
+          print('[FCM] Token registered with backend successfully');
+        } else {
+          print('[FCM] Token registration returned: $result');
+        }
+      } catch (e) {
+        print('[FCM] Error registering token with backend: $e');
+        // Don't throw - token is saved locally, will retry after login
       }
     } catch (e) {
-      print('[FCM] Error registering token with backend: $e');
+      print('[FCM] Error in token registration: $e');
     }
   }
 

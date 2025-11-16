@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 import os
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 from uuid import UUID
 import uuid
 import aiofiles
@@ -141,11 +141,13 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(),
     token_data = {"user_id": user.user_id, "role": user.role}
     access_token = auth.create_access_token(token_data, expires_delta=timedelta(days=7))
     
+    # RETURN USER NAME IN RESPONSE (CRITICAL FIX)
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "user_id": user.user_id,
-        "role": user.role
+        "role": user.role,
+        "name": user.name  # ← ADD THIS LINE
     }
 
 
@@ -881,38 +883,36 @@ async def get_session_state(session_id: int, db: Annotated[AsyncSession, Depends
 # Add endpoint to register FCM tokens - Register or update FCM token for push notifications
 @app.post("/users/fcm-token")
 async def register_fcm_token(
-    token: str = Form(...),
-    device_type: str = Form("unknown"),
+    data: schemas.FCMTokenRequest,
     current_user: models.User = Depends(get_user_by_id),
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        # Check if token already exists for this user
-        q = await db.execute(
+        result = await db.execute(
             select(models.FCMToken).filter(
                 models.FCMToken.user_id == current_user.user_id,
-                models.FCMToken.token == token
+                models.FCMToken.token == data.token,
             )
         )
-        existing_token = q.scalar_one_or_none()
-        
+        existing_token: Optional[models.FCMToken] = result.scalar_one_or_none()
+
         if existing_token:
-            # Update last_used timestamp
             existing_token.last_used = datetime.utcnow()
             await db.commit()
             return {"ok": True, "message": "Token updated"}
-        
-        # Create new token record
-        fcm_token = models.FCMToken(
+
+        new_token = models.FCMToken(
             user_id=current_user.user_id,
-            token=token,
-            device_type=device_type
+            token=data.token,
+            device_type=data.device_type,
+            last_used=datetime.utcnow(),
         )
-        db.add(fcm_token)
+        db.add(new_token)
         await db.commit()
-        
         return {"ok": True, "message": "Token registered"}
+
     except Exception as e:
+        await db.rollback()
         print(f"[FCM] Error registering token: {e}")
         raise HTTPException(status_code=500, detail="Failed to register token")
 
@@ -923,28 +923,29 @@ async def register_fcm_token(
 # Add endpoint to remove FCM token (when user logs out)
 @app.delete("/users/fcm-token")
 async def remove_fcm_token(
-    token: str = Form(...),
+    data: schemas.FCMTokenDeleteRequest,
     current_user: models.User = Depends(get_user_by_id),
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        q = await db.execute(
+        result = await db.execute(
             select(models.FCMToken).filter(
                 models.FCMToken.user_id == current_user.user_id,
-                models.FCMToken.token == token
+                models.FCMToken.token == data.token,
             )
         )
-        fcm_token = q.scalar_one_or_none()
-        
-        if fcm_token:
-            await db.delete(fcm_token)
-            await db.commit()
-            return {"ok": True, "message": "Token removed"}
-        
-        return {"ok": True, "message": "Token not found"}
+        fcm_token = result.scalar_one_or_none()
+        if not fcm_token:
+            return {"ok": True, "message": "Token not found"}
+
+        await db.delete(fcm_token)
+        await db.commit()
+        return {"ok": True, "message": "Token removed"}
     except Exception as e:
+        await db.rollback()
         print(f"[FCM] Error removing token: {e}")
         raise HTTPException(status_code=500, detail="Failed to remove token")
+
 
 
 

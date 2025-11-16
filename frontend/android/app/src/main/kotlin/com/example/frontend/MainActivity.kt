@@ -1,4 +1,4 @@
-package com.example.accessible_conference
+package com.example.frontend
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

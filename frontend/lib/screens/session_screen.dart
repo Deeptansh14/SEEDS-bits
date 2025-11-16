@@ -1226,7 +1226,7 @@ class _SessionScreenState extends State<SessionScreen> {
       appBar: AppBar(
         title: Text(
           'Session ${widget.sessionId}',
-          style: TextStyle(fontSize: isMobile ? 16 : 20),
+          style: TextStyle(fontSize: MediaQuery.of(context).size.width < 400 ? 16 : 20),
         ),
         backgroundColor: Colors.teal,
         actions: [
@@ -1235,7 +1235,7 @@ class _SessionScreenState extends State<SessionScreen> {
             IconButton(
               icon: const Icon(Icons.person_add),
               tooltip: 'Invite Students',
-              iconSize: isMobile ? 28 : 24,
+              iconSize: 24,
               onPressed: () {
                 Navigator.pushNamed(
                   context,
@@ -1252,39 +1252,15 @@ class _SessionScreenState extends State<SessionScreen> {
             IconButton(
               icon: const Icon(Icons.library_music),
               tooltip: 'Audio Library',
-              iconSize: isMobile ? 28 : 24,
+              iconSize: 24,
               onPressed: _openAudioLibrary,
             ),
-          // Participant count badge
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.people, size: 18, color: Colors.teal),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${participantsList.length}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.teal,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          // REMOVED: Participant count badge (causes overflow on small screens)
+          // Leave button
           IconButton(
             icon: const Icon(Icons.call_end),
             tooltip: 'Leave',
-            iconSize: isMobile ? 28 : 24,
+            iconSize: 24,
             onPressed: _leaveSession,
           ),
         ],
@@ -1293,71 +1269,83 @@ class _SessionScreenState extends State<SessionScreen> {
         children: [
           // Session audio status indicator with controls
           if (_currentAudioId != null)
-            _buildAudioControlSection(), 
-          // Large mic status indicator
+            _buildAudioControlSection(),
+          
+          // Large mic status indicator - make more compact on small screens
           Container(
             width: double.infinity,
-            padding: EdgeInsets.all(isMobile ? 16 : 20),
+            padding: EdgeInsets.all(MediaQuery.of(context).size.width < 400 ? 12 : 20),
             color: _muted ? Colors.red.shade50 : Colors.green.shade50,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: isMobile ? 60 : 80,
-                  height: isMobile ? 60 : 80,
+                  width: MediaQuery.of(context).size.width < 400 ? 50 : 80,
+                  height: MediaQuery.of(context).size.width < 400 ? 50 : 80,
                   decoration: BoxDecoration(
                     color: _muted ? Colors.red : Colors.green,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     _muted ? Icons.mic_off : Icons.mic,
-                    size: isMobile ? 30 : 40,
+                    size: MediaQuery.of(context).size.width < 400 ? 24 : 40,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _muted ? 'MUTED' : 'LIVE',
-                      style: TextStyle(
-                        fontSize: isMobile ? 20 : 24,
-                        fontWeight: FontWeight.bold,
-                        color: _muted ? Colors.red : Colors.green,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _muted ? 'MUTED' : 'LIVE',
+                        style: TextStyle(
+                          fontSize: MediaQuery.of(context).size.width < 400 ? 18 : 24,
+                          fontWeight: FontWeight.bold,
+                          color: _muted ? Colors.red : Colors.green,
+                        ),
                       ),
-                    ),
-                    Text(
-                      widget.userName,
-                      style: TextStyle(
-                        fontSize: isMobile ? 14 : 16,
-                        color: Colors.grey.shade700,
+                      Text(
+                        widget.userName,
+                        style: TextStyle(
+                          fontSize: MediaQuery.of(context).size.width < 400 ? 12 : 16,
+                          color: Colors.grey.shade700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
           
-          // Large action buttons
+          // Large action buttons - more compact on mobile
           Container(
-            padding: EdgeInsets.all(isMobile ? 12 : 16),
+            padding: EdgeInsets.all(MediaQuery.of(context).size.width < 400 ? 8 : 16),
             color: Colors.white,
             child: Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _toggleMute,
-                    icon: Icon(_muted ? Icons.mic : Icons.mic_off, size: isMobile ? 24 : 20),
+                    icon: Icon(
+                      _muted ? Icons.mic : Icons.mic_off,
+                      size: MediaQuery.of(context).size.width < 400 ? 20 : 24,
+                    ),
                     label: Text(
                       _muted ? 'Unmute' : 'Mute',
-                      style: TextStyle(fontSize: isMobile ? 16 : 14),
+                      style: TextStyle(
+                        fontSize: MediaQuery.of(context).size.width < 400 ? 14 : 16,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _muted ? Colors.green : Colors.red,
-                      padding: EdgeInsets.symmetric(vertical: isMobile ? 18 : 16),
-                      minimumSize: const Size(0, 56),
+                      padding: EdgeInsets.symmetric(
+                        vertical: MediaQuery.of(context).size.width < 400 ? 12 : 16,
+                      ),
+                      minimumSize: const Size(0, 48),
                     ),
                   ),
                 ),
@@ -1367,16 +1355,20 @@ class _SessionScreenState extends State<SessionScreen> {
                     onPressed: _toggleHandRaise,
                     icon: Icon(
                       _handRaised ? Icons.pan_tool : Icons.pan_tool_outlined,
-                      size: isMobile ? 24 : 20,
+                      size: MediaQuery.of(context).size.width < 400 ? 20 : 24,
                     ),
                     label: Text(
                       _handRaised ? 'Lower' : 'Raise',
-                      style: TextStyle(fontSize: isMobile ? 16 : 14),
+                      style: TextStyle(
+                        fontSize: MediaQuery.of(context).size.width < 400 ? 14 : 16,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _handRaised ? Colors.amber : Colors.grey,
-                      padding: EdgeInsets.symmetric(vertical: isMobile ? 18 : 16),
-                      minimumSize: const Size(0, 56),
+                      padding: EdgeInsets.symmetric(
+                        vertical: MediaQuery.of(context).size.width < 400 ? 12 : 16,
+                      ),
+                      minimumSize: const Size(0, 48),
                     ),
                   ),
                 ),
@@ -1388,7 +1380,7 @@ class _SessionScreenState extends State<SessionScreen> {
           
           // Participants and Chat split
           Expanded(
-            child: isMobile
+            child: MediaQuery.of(context).size.width < 600
                 ? _buildMobileLayout(participantsList)
                 : _buildDesktopLayout(participantsList),
           ),
@@ -1459,42 +1451,67 @@ class _SessionScreenState extends State<SessionScreen> {
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
+            // Make it more compact for mobile
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            
             leading: CircleAvatar(
               backgroundColor: p['is_muted'] ? Colors.red : Colors.green,
+              radius: 20, // Slightly smaller
               child: Icon(
                 p['is_muted'] ? Icons.mic_off : Icons.mic,
                 color: Colors.white,
-                size: 20,
+                size: 18,
               ),
             ),
+            
             title: Text(
               isSelf ? '${p['name']} (You)' : p['name'],
               style: TextStyle(
                 fontWeight: isSelf ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14, // Smaller font for mobile
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+            
             subtitle: Text(
               p['is_teacher'] ? 'Teacher' : 'Student',
               style: TextStyle(
                 color: p['is_teacher'] ? Colors.teal : Colors.grey,
+                fontSize: 12,
               ),
             ),
+            
             trailing: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: MainAxisSize.min, // IMPORTANT: Prevent overflow
               children: [
+                // Raised hand indicator
                 if (p['raised_hand'])
-                  const Icon(Icons.pan_tool, color: Colors.amber, size: 24),
+                  const Padding(
+                    padding: EdgeInsets.only(right: 4),
+                    child: Icon(Icons.pan_tool, color: Colors.amber, size: 20),
+                  ),
+                
+                // Teacher controls - more compact
                 if (widget.isTeacher && !isSelf) ...[
                   IconButton(
                     icon: Icon(
                       p['is_muted'] ? Icons.mic : Icons.mic_off,
-                      color: Colors.blue,
+                      size: 20,
                     ),
+                    color: Colors.blue,
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(), // Remove default constraints
                     onPressed: () => _muteParticipant(participantId, !p['is_muted']),
+                    tooltip: p['is_muted'] ? 'Unmute' : 'Mute',
                   ),
                   IconButton(
-                    icon: const Icon(Icons.remove_circle, color: Colors.red),
+                    icon: const Icon(Icons.remove_circle, size: 20),
+                    color: Colors.red,
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(),
                     onPressed: () => _kickParticipant(participantId),
+                    tooltip: 'Remove',
                   ),
                 ],
               ],
@@ -1505,24 +1522,29 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 
+
   Widget _buildChatPanel() {
     return Column(
       children: [
+        // Header
         Container(
           padding: const EdgeInsets.all(12),
           color: Colors.teal.shade50,
           child: Row(
             children: [
-              const Icon(Icons.chat, color: Colors.teal),
+              const Icon(Icons.chat, color: Colors.teal, size: 20),
               const SizedBox(width: 8),
-              const Text(
-                'Chat',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              const Expanded(
+                child: Text(
+                  'Chat',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
-              const Spacer(),
               IconButton(
-                icon: Icon(_ttsEnabled ? Icons.volume_up : Icons.volume_off),
+                icon: Icon(_ttsEnabled ? Icons.volume_up : Icons.volume_off, size: 20),
                 tooltip: 'Toggle TTS',
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
                 onPressed: () {
                   setState(() => _ttsEnabled = !_ttsEnabled);
                   _speakIfEnabled(_ttsEnabled ? "TTS enabled" : "TTS disabled");
@@ -1531,17 +1553,19 @@ class _SessionScreenState extends State<SessionScreen> {
             ],
           ),
         ),
+        
+        // Messages - with proper flex
         Expanded(
           child: _messages.isEmpty
               ? const Center(
                   child: Text(
                     'No messages yet',
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                 )
               : ListView.builder(
                   controller: _chatScrollController,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   itemCount: _messages.length,
                   itemBuilder: (context, index) {
                     final msg = _messages[index];
@@ -1551,7 +1575,7 @@ class _SessionScreenState extends State<SessionScreen> {
                       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         constraints: BoxConstraints(
                           maxWidth: MediaQuery.of(context).size.width * 0.7,
                         ),
@@ -1561,18 +1585,21 @@ class _SessionScreenState extends State<SessionScreen> {
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               msg['sender'],
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                                fontSize: 11,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
                               msg['text'],
-                              style: const TextStyle(fontSize: 16),
+                              style: const TextStyle(fontSize: 14),
                             ),
                           ],
                         ),
@@ -1581,8 +1608,10 @@ class _SessionScreenState extends State<SessionScreen> {
                   },
                 ),
         ),
+        
+        // Input - more compact for mobile
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -1593,39 +1622,45 @@ class _SessionScreenState extends State<SessionScreen> {
               ),
             ],
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _chatController,
-                  decoration: InputDecoration(
-                    hintText: "Type a message...",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
+          child: SafeArea(
+            top: false,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _chatController,
+                    decoration: InputDecoration(
+                      hintText: "Message...",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      isDense: true,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+                    onSubmitted: (_) => _sendMessage(),
+                    style: const TextStyle(fontSize: 14),
+                    maxLines: 1,
                   ),
-                  onSubmitted: (_) => _sendMessage(),
-                  style: const TextStyle(fontSize: 16),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 56,
-                height: 56,
-                decoration: const BoxDecoration(
-                  color: Colors.teal,
-                  shape: BoxShape.circle,
+                const SizedBox(width: 8),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: Colors.teal,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                    padding: EdgeInsets.zero,
+                    onPressed: _sendMessage,
+                  ),
                 ),
-                child: IconButton(
-                  icon: const Icon(Icons.send, color: Colors.white, size: 24),
-                  onPressed: _sendMessage,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],

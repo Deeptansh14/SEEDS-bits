@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-// import 'package:frontend/services/api_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/tts_service.dart';
+import '../services/api_service.dart';
 import 'teacher_dashboard.dart';
 import 'student_dashboard.dart';
 
@@ -47,6 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final accessToken = data['access_token'];
         final userId = data['user_id'];
         final role = data['role'];
+        final userName = data['name']; // ✅ Get name from backend
 
         if (accessToken == null || userId == null || role == null) {
           TtsService.speak("Invalid response from server");
@@ -58,10 +60,24 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setString('token', accessToken);
         await prefs.setInt('user_id', userId);
         await prefs.setString('role', role);
+        
+        // ✅ SAVE USER NAME (CRITICAL FIX)
+        if (userName != null) {
+          await prefs.setString('user_name', userName);
+          await prefs.setString('name', userName); // Fallback key
+          debugPrint("Login successful for user: $userName");
+        } else {
+          debugPrint("Warning: No name in login response");
+        }
+
+        // Register FCM token after login (non-blocking)
+        _registerFCMTokenIfAvailable();
 
         TtsService.speak("Login successful");
 
         // Navigate based on actual backend role
+        if (!mounted) return;
+        
         if (role.toLowerCase() == 'teacher') {
           Navigator.pushReplacement(
             context,
@@ -83,10 +99,43 @@ class _LoginScreenState extends State<LoginScreen> {
       TtsService.speak("Login failed. Check network or credentials.");
       debugPrint("Login error: $e");
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
+  // Register FCM token with backend after login
+  Future<void> _registerFCMTokenIfAvailable() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final fcmToken = prefs.getString('fcm_token');
+      
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        print('[LOGIN] Registering saved FCM token with backend');
+        
+        final result = await ApiService.post(
+          '/users/fcm-token',
+          {
+            'token': fcmToken,
+            'device_type': kIsWeb ? 'web' : 'mobile',
+          },
+          useAuth: true,
+        );
+        
+        if (result != null && result['ok'] == true) {
+          print('[LOGIN] FCM token registered successfully');
+        } else {
+          print('[LOGIN] FCM token registration response: $result');
+        }
+      } else {
+        print('[LOGIN] No FCM token to register');
+      }
+    } catch (e) {
+      print('[LOGIN] Error registering FCM token: $e');
+      // Don't throw - not critical for login
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: const InputDecoration(
                     labelText: "Phone number",
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.phone),
                   ),
                   keyboardType: TextInputType.phone,
                   onTap: () => TtsService.speak("Enter phone number"),
@@ -119,6 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: const InputDecoration(
                     labelText: "Password",
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock),
                   ),
                   onTap: () => TtsService.speak("Enter password"),
                 ),
@@ -134,24 +185,36 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: isLoading ? null : _login,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 14,
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 40,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    child: isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            "Login",
+                            style: TextStyle(fontSize: 18, color: Colors.white),
+                          ),
                   ),
-                  child: isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          "Login",
-                          style: TextStyle(fontSize: 18, color: Colors.white),
-                        ),
+                ),
+                const SizedBox(height: 16),
+                // Add "Create account" option
+                TextButton(
+                  onPressed: () => Navigator.pushNamed(context, '/register'),
+                  child: const Text(
+                    "Don't have an account? Register",
+                    style: TextStyle(fontSize: 16),
+                  ),
                 ),
               ],
             ),

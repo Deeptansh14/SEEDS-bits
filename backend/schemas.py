@@ -308,3 +308,14 @@ class SuccessResponse(BaseModel):
     ok: bool = True
     message: Optional[str] = None
     data: Optional[dict] = None
+
+
+# ==================== NOTIFICATIONS SCHEMAS ====================
+
+class FCMTokenRequest(BaseModel):
+    token: str
+    device_type: Optional[str] = "unknown"
+
+
+class FCMTokenDeleteRequest(BaseModel):
+    token: str

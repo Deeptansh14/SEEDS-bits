@@ -269,99 +269,102 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Welcome Card
-            Card(
-              elevation: 4,
-              color: Colors.indigo.shade50,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Welcome, ${currentUserName ?? 'Teacher'}!",
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.indigo,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Manage your sessions and connect with students",
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Create Session Button
-            ElevatedButton.icon(
-              onPressed: createSession,
-              icon: const Icon(Icons.add_circle_outline, size: 28),
-              label: const Text(
-                "Create New Session",
-                style: TextStyle(fontSize: 18),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Sessions Header
-            Row(
+      body: SafeArea(
+        child: SingleChildScrollView(  // ← ADD THIS
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  "Your Sessions",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                // Welcome Card
+                Card(
+                  elevation: 4,
+                  color: Colors.indigo.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Welcome, ${currentUserName ?? 'Teacher'}!",
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.indigo,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Manage your sessions and connect with students",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                if (sessions.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.indigo,
+                
+                const SizedBox(height: 20),
+                
+                // Create Session Button
+                ElevatedButton.icon(
+                  onPressed: createSession,
+                  icon: const Icon(Icons.add_circle_outline, size: 28),
+                  label: const Text(
+                    "Create New Session",
+                    style: TextStyle(fontSize: 18),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      '${sessions.length}',
-                      style: const TextStyle(
-                        color: Colors.white,
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Sessions Header
+                Row(
+                  children: [
+                    const Text(
+                      "Your Sessions",
+                      style: TextStyle(
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
                       ),
                     ),
-                  ),
-              ],
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Sessions List
-            Expanded(
-              child: sessions.isEmpty
-                  ? Center(
+                    const SizedBox(width: 8),
+                    if (sessions.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.indigo,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${sessions.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                
+                const SizedBox(height: 12),
+                
+                // Sessions List - NO EXPANDED, just list items
+                if (sessions.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(40),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -388,132 +391,132 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
                           ),
                         ],
                       ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadSessions,
-                      child: ListView.builder(
-                        itemCount: sessions.length,
-                        itemBuilder: (context, i) {
-                          final s = sessions[i];
-                          final sessionId = s['session_id'] ?? 0;
-                          final title = s['title'] ?? 'Untitled Session';
-                          final participantCount = s['participant_count'] ?? 0;
-                          final createdAt = s['created_at'] ?? '';
-                          
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: 3,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: InkWell(
-                              onTap: () => _openSession(sessionId),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Row(
+                    ),
+                  )
+                else
+                  ...sessions.map((s) {
+                    final sessionId = s['session_id'] ?? 0;
+                    final title = s['title'] ?? 'Untitled Session';
+                    final participantCount = s['participant_count'] ?? 0;
+                    final createdAt = s['created_at'] ?? '';
+                    
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: InkWell(
+                        onTap: () => _openSession(sessionId),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              // Session Icon
+                              Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  color: Colors.indigo.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '$sessionId',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.indigo.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              
+                              const SizedBox(width: 16),
+                              
+                              // Session Details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // Session Icon
-                                    Container(
-                                      width: 60,
-                                      height: 60,
-                                      decoration: BoxDecoration(
-                                        color: Colors.indigo.shade100,
-                                        borderRadius: BorderRadius.circular(12),
+                                    Text(
+                                      title,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                      child: Center(
-                                        child: Text(
-                                          '$sessionId',
-                                          style: TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.indigo.shade700,
-                                          ),
-                                        ),
-                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    
-                                    const SizedBox(width: 16),
-                                    
-                                    // Session Details
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            title,
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.people,
-                                                size: 16,
-                                                color: Colors.grey.shade600,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                '$participantCount participant${participantCount != 1 ? 's' : ''}',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey.shade600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          if (createdAt.isNotEmpty) ...[
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Created: $createdAt',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey.shade500,
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    
-                                    // Action Buttons
-                                    Column(
+                                    const SizedBox(height: 8),
+                                    Row(
                                       children: [
-                                        ElevatedButton.icon(
-                                          onPressed: () => _openSession(sessionId),
-                                          icon: const Icon(Icons.login, size: 18),
-                                          label: const Text("Open"),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.green,
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 8,
-                                            ),
-                                          ),
+                                        Icon(
+                                          Icons.people,
+                                          size: 16,
+                                          color: Colors.grey.shade600,
                                         ),
-                                        const SizedBox(height: 8),
-                                        IconButton(
-                                          onPressed: () => _deleteSession(sessionId, title),
-                                          icon: const Icon(Icons.delete),
-                                          color: Colors.red,
-                                          tooltip: "Delete Session",
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '$participantCount participant${participantCount != 1 ? 's' : ''}',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey.shade600,
+                                          ),
                                         ),
                                       ],
                                     ),
+                                    if (createdAt.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Created: $createdAt',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade500,
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                              
+                              // Action Buttons
+                              Column(
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: () => _openSession(sessionId),
+                                    icon: const Icon(Icons.login, size: 18),
+                                    label: const Text("Open"),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  IconButton(
+                                    onPressed: () => _deleteSession(sessionId, title),
+                                    icon: const Icon(Icons.delete),
+                                    color: Colors.red,
+                                    tooltip: "Delete Session",
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                    );
+                  }).toList(),
+                  
+                const SizedBox(height: 20), // Bottom padding
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
